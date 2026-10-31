@@ -3,6 +3,7 @@ package com.miqat.app.core
 import android.content.Context
 import com.miqat.app.hijri.CalendarMethod
 import com.miqat.app.timetable.MethodPref
+import com.miqat.app.zakat.NisabBasis
 
 data class SavedLocation(val lat: Double, val lon: Double, val manual: Boolean)
 
@@ -46,4 +47,14 @@ class Prefs(context: Context) {
     var countryCode: String?
         get() = sp.getString("country", null)
         set(v) = sp.edit().putString("country", v).apply()
+
+    var nisabBasis: NisabBasis
+        get() = runCatching { NisabBasis.valueOf(sp.getString("nisab_basis", NisabBasis.SILVER.name)!!) }
+            .getOrDefault(NisabBasis.SILVER)
+        set(v) = sp.edit().putString("nisab_basis", v.name).apply()
+
+    /** null = automatic (currency of the country you are in). */
+    var zakatCurrency: String?
+        get() = sp.getString("zakat_currency", null)
+        set(v) = sp.edit().putString("zakat_currency", v).apply()
 }

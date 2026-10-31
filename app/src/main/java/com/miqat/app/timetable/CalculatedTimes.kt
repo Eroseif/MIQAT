@@ -15,7 +15,7 @@ import kotlin.math.abs
 /**
  * Astronomical prayer times for any GPS position, using the method that is usual for the area.
  * These are NOT a mosque's timetable and are always labelled as calculated.
- * Times are shown in the phone's time zone. Both Asr conventions are listed.
+ * Times are shown in the phone's time zone.
  */
 object CalculatedTimes {
     fun compute(lat: Double, lon: Double, date: LocalDate, choice: MethodChoice): Timetable? = try {
@@ -29,7 +29,6 @@ object CalculatedTimes {
             return p
         }
         val std = PrayerTimes(coords, dc, params(Madhab.SHAFI))
-        val han = PrayerTimes(coords, dc, params(Madhab.HANAFI))
         val fmt = SimpleDateFormat("HH:mm", Locale.US)
         fun f(d: Date?): String? = d?.let { fmt.format(it) }
         Timetable(
@@ -39,7 +38,6 @@ object CalculatedTimes {
                 PrayerRow("Sunrise", f(std.sunrise), null),
                 PrayerRow("Dhuhr", f(std.dhuhr), null),
                 PrayerRow("Asr", f(std.asr), null),
-                PrayerRow("Asr (Hanafi)", f(han.asr), null),
                 PrayerRow("Maghrib", f(std.maghrib), null),
                 PrayerRow("Isha", f(std.isha), null)
             ),

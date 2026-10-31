@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Explore
 import androidx.compose.material.icons.outlined.Mosque
@@ -51,7 +52,8 @@ fun MiqatRoot(vm: AppViewModel, onRequestPermission: () -> Unit) {
     val tabs = listOf(
         Tab("Calendar", Icons.Outlined.CalendarMonth),
         Tab("Prayer Times", Icons.Outlined.Mosque),
-        Tab("Qibla", Icons.Outlined.Explore)
+        Tab("Qibla", Icons.Outlined.Explore),
+        Tab("Zakat", Icons.Outlined.AccountBalanceWallet)
     )
     var showAdd by remember { mutableStateOf(false) }
     var addDate by remember { mutableStateOf<LocalDate?>(null) }
@@ -87,7 +89,7 @@ fun MiqatRoot(vm: AppViewModel, onRequestPermission: () -> Unit) {
                         selected = selected == i && !showSettings,
                         onClick = { selected = i; showSettings = false },
                         icon = { Icon(t.icon, contentDescription = t.label, tint = White) },
-                        label = { Text(t.label) },
+                        label = { Text(t.label, fontSize = 11.sp, maxLines = 1) },
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = White, selectedTextColor = White,
                             unselectedIconColor = White, unselectedTextColor = LightGrey,
@@ -105,7 +107,8 @@ fun MiqatRoot(vm: AppViewModel, onRequestPermission: () -> Unit) {
                 when (selected) {
                     0 -> CalendarScreen(state, vm, onAddEvent = { d -> addDate = d; showAdd = true })
                     1 -> PrayerScreen(state, vm, onRequestPermission)
-                    else -> QiblaScreen(state)
+                    2 -> QiblaScreen(state)
+                    else -> ZakatScreen(state, vm)
                 }
             }
         }

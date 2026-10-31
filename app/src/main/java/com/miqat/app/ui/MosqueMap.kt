@@ -78,7 +78,7 @@ fun MosqueMap(point: LatLon, mosques: List<Mosque>, onSelect: (String) -> Unit, 
                     icon = dot(true, size)
                     title = mq.name
                     setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
-                    setOnMarkerClickListener { _, _ -> onSelect(mq.id); true }
+                    setOnMarkerClickListener { mk, _ -> mk.showInfoWindow(); true }
                 })
             }
             if (m.tag != point) {

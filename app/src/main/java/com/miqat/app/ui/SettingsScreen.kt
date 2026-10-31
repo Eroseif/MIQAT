@@ -27,6 +27,13 @@ import com.miqat.app.hijri.CalendarMethod
 import com.miqat.app.hijri.HijriCalendar
 import com.miqat.app.hijri.Occasion
 import com.miqat.app.timetable.MethodPref
+import com.miqat.app.zakat.NisabBasis
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.text.input.KeyboardType
 import java.time.LocalDate
 
 @Composable
@@ -59,6 +66,46 @@ fun SettingsScreen(state: UiState, vm: AppViewModel) {
                         Text(m.label, fontSize = 14.sp)
                     }
                 }
+            }
+        }
+
+        item {
+            var code by remember(state.zakatCurrency) { mutableStateOf(state.zakatCurrency ?: "") }
+            MiqatCard {
+                Text("Zakat", fontWeight = FontWeight.SemiBold)
+                Text("Nisab is measured in", color = LightGrey, fontSize = 12.sp)
+                NisabBasis.values().forEach { b ->
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        RadioButton(
+                            selected = state.nisabBasis == b,
+                            onClick = { vm.setNisabBasis(b) },
+                            colors = RadioButtonDefaults.colors(selectedColor = White, unselectedColor = White)
+                        )
+                        Text(b.label, fontSize = 14.sp)
+                    }
+                }
+                HorizontalDivider(color = DividerGrey, modifier = Modifier.padding(vertical = 6.dp))
+                Text("Currency", color = LightGrey, fontSize = 12.sp)
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    RadioButton(
+                        selected = state.zakatCurrency == null,
+                        onClick = { code = ""; vm.setZakatCurrency(null) },
+                        colors = RadioButtonDefaults.colors(selectedColor = White, unselectedColor = White)
+                    )
+                    Text("Automatic (country you are in)", fontSize = 14.sp)
+                }
+                OutlinedTextField(
+                    value = code,
+                    onValueChange = { v ->
+                        val c = v.filter { ch -> ch.isLetter() }.take(3).uppercase()
+                        code = c
+                        if (c.length == 3) vm.setZakatCurrency(c)
+                    },
+                    label = { Text("Or a currency code (GBP, DZD, USD…)") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
         }
 

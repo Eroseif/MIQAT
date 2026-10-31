@@ -22,6 +22,9 @@ import com.miqat.app.timetable.RegionMethods
 import com.miqat.app.timetable.Timetable
 import com.miqat.app.timetable.TimetableBundle
 import com.miqat.app.timetable.TimetableRepository
+import com.miqat.app.zakat.MarketPrices
+import com.miqat.app.zakat.NisabBasis
+import com.miqat.app.zakat.PriceRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -57,6 +60,12 @@ data class AreaState(
     val officialNote: String? = null
 )
 
+data class PricesState(
+    val prices: MarketPrices? = null,
+    val loading: Boolean = false,
+    val stale: Boolean = false
+)
+
 data class UiState(
     val point: LatLon? = null,
     val manual: Boolean = false,
@@ -74,6 +83,9 @@ data class UiState(
     val timetables: Map<String, TtState> = emptyMap(),
     val area: AreaState = AreaState(),
     val methodPref: MethodPref = MethodPref.AUTOMATIC,
+    val prices: PricesState = PricesState(),
+    val nisabBasis: NisabBasis = NisabBasis.SILVER,
+    val zakatCurrency: String? = null,
     val calendarMethod: CalendarMethod = CalendarMethod.UMM_AL_QURA,
     val dayAdjustment: Int = 0
 )
@@ -92,6 +104,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val mosqueRepo = MosqueRepository(db.cache(), http)
     private val timetableRepo = TimetableRepository(db.cache(), listOf(mawaqit))
     private val areaRepo = AreaRepository(db.cache(), mawaqit)
+    private val priceRepo = PriceRepository(db.cache(), http)
+    private var pricesJob: Job? = null
 
     private val eventsDb = EventsDb.build(app)
 
@@ -104,6 +118,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             calendarMethod = prefs.calendarMethod,
             dayAdjustment = prefs.dayAdjustment,
             methodPref = prefs.methodPref,
+            nisabBasis = prefs.nisabBasis,
+            zakatCurrency = prefs.zakatCurrency,
             countryCode = prefs.countryCode
         )
     )
@@ -267,6 +283,36 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun deleteEvent(id: Long) {
         viewModelScope.launch { eventsDb.events().delete(id) }
+    }
+
+    /** Gold/silver prices and exchange rates for the Zakat tab (cached, so cheap to call often). */
+    fun refreshPrices(force: Boolean = false) {
+        if (pricesJob?.isActive == true) return
+        pricesJob = viewModelScope.launch {
+            _state.update { it.copy(prices = it.prices.copy(loading = true)) }
+            val r = priceRepo.load(force)
+            _state.update {
+                val old = it.prices.prices
+                it.copy(
+                    prices = when {
+                        r.prices != null -> PricesState(r.prices, loading = false, stale = r.stale)
+                        old != null -> PricesState(old, loading = false, stale = true)
+                        else -> PricesState(null, loading = false, stale = false)
+                    }
+                )
+            }
+        }
+    }
+
+    fun setNisabBasis(b: NisabBasis) {
+        prefs.nisabBasis = b
+        _state.update { it.copy(nisabBasis = b) }
+    }
+
+    /** null = automatic (currency of the country you are in). */
+    fun setZakatCurrency(code: String?) {
+        prefs.zakatCurrency = code
+        _state.update { it.copy(zakatCurrency = code) }
     }
 
     fun setMethodPref(pref: MethodPref) {

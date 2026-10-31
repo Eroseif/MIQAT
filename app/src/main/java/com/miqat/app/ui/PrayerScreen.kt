@@ -1,37 +1,29 @@
 package com.miqat.app.ui
 
-import android.content.Intent
-import android.net.Uri
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.layout.Box
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -39,101 +31,48 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.miqat.app.AppViewModel
 import com.miqat.app.AreaState
-import com.miqat.app.TtState
 import com.miqat.app.UiState
-import com.miqat.app.core.Geo
-import com.miqat.app.data.Mosque
-import com.miqat.app.timetable.Timetable
-import com.miqat.app.timetable.TimetableBundle
-import java.text.DateFormat
-import java.util.Date
 import java.util.Locale
 
-private const val HEADER_ITEMS = 3 // status column, map, section title
-
+/** Location on top, prayer times for the area, map underneath. */
 @Composable
 fun PrayerScreen(state: UiState, vm: AppViewModel, onRequestPermission: () -> Unit) {
-    val listState = rememberLazyListState()
     var showDialog by remember { mutableStateOf(false) }
+    val p = state.point
+    val label = state.placeName
+        ?: p?.let { String.format(Locale.US, "%.3f, %.3f", it.lat, it.lon) }
+        ?: "Choose location"
 
-    // Scroll to a mosque when it is chosen on the map.
-    LaunchedEffect(state.expandedId) {
-        val idx = state.mosques.indexOfFirst { it.id == state.expandedId }
-        if (idx >= 0) listState.animateScrollToItem(HEADER_ITEMS + idx)
-    }
-
-    LazyColumn(
-        state = listState,
-        modifier = Modifier.fillMaxWidth(),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        item {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                LocationCard(state, onChange = { showDialog = true }, onUseGps = { vm.useGps() })
-                if (state.point != null) AreaCard(state.area, state.manual)
-                if (!state.permissionGranted && !state.manual) {
-                    MiqatCard {
-                        Text("Location permission is off", fontWeight = FontWeight.SemiBold)
-                        Text("Allow location to find mosques near you, or choose a location manually.", color = LightGrey)
-                        Spacer(Modifier.height(8.dp))
-                        MiqatButton("Allow location", onClick = onRequestPermission)
-                    }
-                }
-                if (state.stale && state.fetchedAt > 0) {
-                    MiqatCard {
-                        Text(
-                            "No internet: showing saved mosques from ${DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(state.fetchedAt))}. They may be out of date.",
-                            color = LightGrey
-                        )
-                    }
-                }
-                state.error?.let { msg ->
-                    MiqatCard {
-                        Text(msg, color = LightGrey)
-                        Spacer(Modifier.height(8.dp))
-                        MiqatButton("Retry", onClick = { vm.startSearch() })
-                    }
+    Column(Modifier.fillMaxSize().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable { showDialog = true }.padding(vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(Icons.Filled.LocationOn, contentDescription = "Choose location", tint = White)
+            Spacer(Modifier.width(6.dp))
+            Text(label, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+            if (state.manual && state.permissionGranted) {
+                IconButton(onClick = { vm.useGps() }, modifier = Modifier.size(36.dp)) {
+                    Icon(Icons.Filled.MyLocation, contentDescription = "Use GPS", tint = White)
                 }
             }
         }
-        item {
-            val p = state.point
-            if (p != null) {
-                MosqueMap(
-                    point = p, mosques = state.mosques, onSelect = { vm.selectMosque(it) },
-                    modifier = Modifier.fillMaxWidth().height(260.dp).clip(RoundedCornerShape(16.dp))
-                )
-            } else {
-                MiqatCard { Text("Waiting for your location…", color = LightGrey) }
-            }
+        if (!state.permissionGranted && p == null) {
+            MiqatButton("Allow location", onClick = onRequestPermission)
         }
-        item {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Nearby mosques (within ${state.radiusKm} km)", fontSize = 18.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-                if (state.loading) CircularProgressIndicator(color = White, modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
-            }
-        }
-        items(state.mosques, key = { it.id }) { m ->
-            MosqueCard(m, expanded = state.expandedId == m.id, tt = state.timetables[m.id], onToggle = { vm.toggleMosque(m.id) }, onRetry = { vm.loadTimetable(m.id) })
-        }
-        item {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (state.searched && !state.loading && state.mosques.isEmpty() && state.error == null) {
-                    Text("No mosques are mapped in OpenStreetMap within ${state.radiusKm} km.", color = LightGrey)
-                }
-                if (state.point != null && state.radiusKm < 50) {
-                    MiqatButton("Search further (${if (state.radiusKm == 10) 25 else 50} km)", onClick = { vm.widenSearch() })
-                }
-                Text("Mosque locations © OpenStreetMap contributors.", color = LightGrey, fontSize = 11.sp)
-            }
+        if (p != null) {
+            TimesCard(state.area)
+            MosqueMap(
+                point = p, mosques = state.mosques, onSelect = {},
+                modifier = Modifier.fillMaxWidth().weight(1f).heightIn(min = 160.dp).clip(RoundedCornerShape(16.dp))
+            )
         }
     }
 
@@ -145,110 +84,39 @@ fun PrayerScreen(state: UiState, vm: AppViewModel, onRequestPermission: () -> Un
     }
 }
 
+/**
+ * Today's times for the area: the nearest published mosque timetable if one was found, otherwise calculated.
+ * One small grey line names the source so calculated times are never mistaken for a mosque's own.
+ */
 @Composable
-private fun LocationCard(state: UiState, onChange: () -> Unit, onUseGps: () -> Unit) {
-    MiqatCard {
-        Text("Current location", color = LightGrey, fontSize = 13.sp)
-        val p = state.point
-        if (p == null) {
-            Text("Not available yet", fontWeight = FontWeight.SemiBold)
-        } else {
-            state.placeName?.let { Text(it, fontWeight = FontWeight.SemiBold, fontSize = 18.sp) }
-            Text(
-                String.format(Locale.US, "%.4f, %.4f  (%s)", p.lat, p.lon, if (state.manual) "chosen manually" else "GPS"),
-                color = LightGrey, fontSize = 13.sp
-            )
-        }
-        Spacer(Modifier.height(8.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            MiqatButton("Choose location", onClick = onChange)
-            if (state.manual && state.permissionGranted) MiqatButton("Use GPS", onClick = onUseGps)
-        }
-    }
-}
-
-@Composable
-private fun MosqueCard(m: Mosque, expanded: Boolean, tt: TtState?, onToggle: () -> Unit, onRetry: () -> Unit) {
-    MiqatCard(onClick = onToggle) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(m.name, fontWeight = FontWeight.SemiBold, fontSize = 17.sp)
-                Text(Geo.formatDistance(m.distanceM) + " away", color = LightGrey)
+private fun TimesCard(area: AreaState) {
+    val official = area.official.firstOrNull()
+    val t = official?.timetable ?: area.calculated
+    MiqatCard(padding = 12.dp) {
+        if (t == null) {
+            if (area.officialLoading) {
+                CircularProgressIndicator(color = White, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+            } else {
+                Text("—", color = LightGrey)
             }
-            Icon(if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown, contentDescription = null, tint = White)
-        }
-        if (expanded) {
-            Spacer(Modifier.height(10.dp))
-            HorizontalDivider(color = DividerGrey)
-            Spacer(Modifier.height(10.dp))
-            when (tt) {
-                null, TtState.Loading -> Row(verticalAlignment = Alignment.CenterVertically) {
-                    CircularProgressIndicator(color = White, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                    Text("  Looking for this mosque's published timetable…", color = LightGrey)
+        } else {
+            val hasIqama = t.rows.any { it.iqama != null }
+            if (hasIqama) {
+                Row(Modifier.fillMaxWidth()) {
+                    Spacer(Modifier.weight(1.4f))
+                    Spacer(Modifier.weight(1f))
+                    Text("Iqamah", color = LightGrey, fontSize = 11.sp, modifier = Modifier.weight(1f))
                 }
-                is TtState.Loaded -> TimetableView(tt.bundle, m, onRetry)
             }
-        }
-    }
-}
-
-@Composable
-private fun TimetableView(b: TimetableBundle, m: Mosque, onRetry: () -> Unit) {
-    val ctx = LocalContext.current
-    fun open(url: String) {
-        try { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) } catch (_: Exception) {}
-    }
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        if (b.official != null) {
-            Text("OFFICIAL MOSQUE TIMETABLE", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-            Text("Source: ${b.official.sourceName} · ${b.official.date}", color = LightGrey, fontSize = 12.sp)
-            if (b.officialStale) Text("Saved copy — you are offline, times may be out of date.", color = LightGrey, fontSize = 12.sp)
-            TimeTable(b.official)
-        } else {
-            Text("Official timetable unavailable", fontWeight = FontWeight.Bold)
-            Text(b.officialNote, color = LightGrey, fontSize = 13.sp)
-            if (b.calculated != null) {
-                Spacer(Modifier.height(6.dp))
-                Text("CALCULATED TIMES — NOT THIS MOSQUE'S OFFICIAL TIMETABLE", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                Text("${b.calculated.sourceName}. Shown in your phone's time zone. Actual mosque times and Iqamah will differ.", color = LightGrey, fontSize = 12.sp)
-                TimeTable(b.calculated)
+            t.rows.forEach { r ->
+                Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(r.name, fontSize = 16.sp, modifier = Modifier.weight(1.4f))
+                    Text(r.start ?: "—", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                    if (hasIqama) Text(r.iqama ?: "—", fontSize = 16.sp, color = LightGrey, modifier = Modifier.weight(1f))
+                }
             }
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            (b.official?.sourceUrl ?: m.website)?.let { url -> MiqatButton("Open timetable source", onClick = { open(url) }) }
-            if (b.official == null) MiqatButton("Retry", onClick = onRetry)
-        }
-        val site = m.website
-        if (site != null && site != b.official?.sourceUrl) {
-            MiqatButton("Open mosque website", onClick = { open(site) })
-        }
-    }
-}
-
-@Composable
-private fun TimeTable(t: Timetable) {
-    val hasIqama = t.rows.any { it.iqama != null }
-    Column {
-        Row(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-            Text("Prayer", color = LightGrey, fontSize = 12.sp, modifier = Modifier.weight(1.4f))
-            Text("Start", color = LightGrey, fontSize = 12.sp, modifier = Modifier.weight(1f))
-            if (hasIqama) Text("Iqamah", color = LightGrey, fontSize = 12.sp, modifier = Modifier.weight(1f))
-        }
-        t.rows.forEach { r ->
-            HorizontalDivider(color = DividerGrey)
-            Row(Modifier.fillMaxWidth().padding(vertical = 7.dp)) {
-                Text(r.name, modifier = Modifier.weight(1.4f))
-                Text(r.start ?: "—", fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-                if (hasIqama) Text(r.iqama ?: "—", modifier = Modifier.weight(1f))
-            }
-        }
-        HorizontalDivider(color = DividerGrey)
-        Row(Modifier.fillMaxWidth().padding(vertical = 7.dp)) {
-            Text("Jumu'ah", modifier = Modifier.weight(1.4f))
-            Text(
-                if (t.jumuah.isEmpty()) (if (t.kind == com.miqat.app.timetable.TimetableKind.OFFICIAL) "not published" else "not available") else t.jumuah.joinToString(", "),
-                modifier = Modifier.weight(if (hasIqama) 2f else 1f)
-            )
+            val source = if (official != null) "Official timetable · ${official.name}" else t.sourceName
+            Text(source, color = LightGrey, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
         }
     }
 }
@@ -276,58 +144,10 @@ private fun ManualLocationDialog(onDismiss: () -> Unit, onConfirm: (Double, Doub
             }
         },
         confirmButton = {
-            TextButton(onClick = { if (valid) onConfirm(latV!!, lonV!!) }, enabled = valid) { Text("Use this location", color = if (valid) White else LightGrey) }
+            TextButton(onClick = { if (valid) onConfirm(latV!!, lonV!!) }, enabled = valid) {
+                Text("Use this location", color = if (valid) White else LightGrey)
+            }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = White) } }
     )
-}
-
-
-@Composable
-private fun AreaCard(area: AreaState, manual: Boolean) {
-    var sel by remember(area.official) { mutableIntStateOf(0) }
-    MiqatCard {
-        Text("Prayer times for your area", fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
-        Spacer(Modifier.height(8.dp))
-        val o = area.official.getOrNull(sel)
-        if (o != null) {
-            Text("OFFICIAL MOSQUE TIMETABLE", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-            Text("${o.name} · ${Geo.formatDistance(o.distanceM)} away", fontWeight = FontWeight.SemiBold)
-            Text("Source: ${o.timetable.sourceName} · ${o.timetable.date}", color = LightGrey, fontSize = 12.sp)
-            if (area.officialStale) Text("Saved copy — you are offline, times may be out of date.", color = LightGrey, fontSize = 12.sp)
-            if (area.official.size > 1) {
-                Row(Modifier.horizontalScroll(rememberScrollState())) {
-                    area.official.forEachIndexed { i, x ->
-                        TextButton(onClick = { sel = i }) {
-                            Text(x.name, color = if (i == sel) White else LightGrey, maxLines = 1,
-                                fontWeight = if (i == sel) FontWeight.Bold else FontWeight.Normal)
-                        }
-                    }
-                }
-            }
-            TimeTable(o.timetable)
-            Spacer(Modifier.height(12.dp))
-        } else if (area.officialLoading) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                CircularProgressIndicator(color = White, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                Text("  Looking for mosque timetables nearby…", color = LightGrey)
-            }
-            Spacer(Modifier.height(12.dp))
-        } else {
-            Text(area.officialNote ?: "No published mosque timetable found within 15 km, so these are calculated times.", color = LightGrey, fontSize = 13.sp)
-            Spacer(Modifier.height(10.dp))
-        }
-        val c = area.calculated
-        if (c != null) {
-            Text("CALCULATED TIMES — NOT A MOSQUE TIMETABLE", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-            Text(
-                "${c.sourceName}. Shown in your phone's time zone" + (if (manual) " (manual location: check the zone)" else "") +
-                    ". Mosques may differ by a few minutes.",
-                color = LightGrey, fontSize = 12.sp
-            )
-            TimeTable(c)
-        } else {
-            Text("Prayer times could not be calculated for this location.", color = LightGrey)
-        }
-    }
 }

@@ -58,7 +58,7 @@ class PrayerTimeTests {
         val choice = com.miqat.app.timetable.RegionMethods.choose(52.39, -2.25, "GB", auto)
         val t = com.miqat.app.timetable.CalculatedTimes.compute(52.39, -2.25, java.time.LocalDate.of(2026, 6, 21), choice)
         org.junit.Assert.assertNotNull(t)
-        assertEquals(7, t!!.rows.size)
+        assertEquals(6, t!!.rows.size)
         org.junit.Assert.assertTrue(t.rows.all { it.start != null })
     }
 }
