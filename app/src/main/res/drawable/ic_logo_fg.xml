@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- MIQAT logo: white hill silhouette (shown on black). 108dp adaptive-icon canvas. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M24,72 C32,60 38,48 45,42 C50,46 53,52 57,57 C62,48 67,41 72,36 C78,46 84,60 90,72 Z" />
+</vector>

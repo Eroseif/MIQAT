@@ -1,0 +1,86 @@
+package com.miqat.app.ui
+
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.Explore
+import androidx.compose.material.icons.outlined.Mosque
+import androidx.compose.material3.Icon
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.miqat.app.AppViewModel
+import com.miqat.app.R
+
+private data class Tab(val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector)
+
+@Composable
+fun MiqatRoot(vm: AppViewModel, onRequestPermission: () -> Unit) {
+    val state by vm.state.collectAsState()
+    var selected by rememberSaveable { mutableIntStateOf(0) }
+    val tabs = listOf(
+        Tab("Prayer Times", Icons.Outlined.Mosque),
+        Tab("Qibla", Icons.Outlined.Explore),
+        Tab("Calendar", Icons.Outlined.CalendarMonth)
+    )
+    Scaffold(
+        containerColor = Black,
+        topBar = {
+            Row(
+                Modifier.fillMaxWidth().background(Black).padding(top = 40.dp, start = 16.dp, end = 16.dp, bottom = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Start
+            ) {
+                Image(painterResource(R.drawable.ic_logo_fg), contentDescription = "MIQAT logo", modifier = Modifier.size(48.dp))
+                Text("MIQAT", color = White, fontSize = 22.sp, fontWeight = FontWeight.Bold, letterSpacing = 4.sp)
+            }
+        },
+        bottomBar = {
+            NavigationBar(containerColor = Black, contentColor = White) {
+                tabs.forEachIndexed { i, t ->
+                    NavigationBarItem(
+                        selected = selected == i,
+                        onClick = { selected = i },
+                        icon = { Icon(t.icon, contentDescription = t.label, tint = White) },
+                        label = { Text(t.label) },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = White, selectedTextColor = White,
+                            unselectedIconColor = White, unselectedTextColor = LightGrey,
+                            indicatorColor = CardGrey
+                        )
+                    )
+                }
+            }
+        }
+    ) { padding ->
+        Box(Modifier.padding(padding).fillMaxSize().background(Black)) {
+            when (selected) {
+                0 -> PrayerScreen(state, vm, onRequestPermission)
+                1 -> QiblaScreen(state)
+                else -> CalendarScreen(state, vm)
+            }
+        }
+    }
+}
