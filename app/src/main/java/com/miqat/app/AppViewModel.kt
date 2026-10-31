@@ -11,6 +11,8 @@ import com.miqat.app.core.SavedLocation
 import com.miqat.app.data.MiqatDb
 import com.miqat.app.data.Mosque
 import com.miqat.app.data.MosqueRepository
+import com.miqat.app.events.EventsDb
+import com.miqat.app.events.UserEvent
 import com.miqat.app.hijri.CalendarMethod
 import com.miqat.app.timetable.AreaRepository
 import com.miqat.app.timetable.CalculatedTimes
@@ -24,8 +26,10 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -88,6 +92,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val mosqueRepo = MosqueRepository(db.cache(), http)
     private val timetableRepo = TimetableRepository(db.cache(), listOf(mawaqit))
     private val areaRepo = AreaRepository(db.cache(), mawaqit)
+
+    private val eventsDb = EventsDb.build(app)
+
+    /** Birthdays and special days added by the user (stored on this phone only). */
+    val events: StateFlow<List<UserEvent>> =
+        eventsDb.events().all().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     private val _state = MutableStateFlow(
         UiState(
@@ -245,6 +255,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             val b = timetableRepo.load(m, choice)
             _state.update { it.copy(timetables = it.timetables + (id to TtState.Loaded(b))) }
         }
+    }
+
+    fun addEvent(date: LocalDate, title: String, description: String, yearly: Boolean) {
+        viewModelScope.launch {
+            eventsDb.events().insert(
+                UserEvent(dateEpochDay = date.toEpochDay(), title = title.trim(), description = description.trim(), yearly = yearly)
+            )
+        }
+    }
+
+    fun deleteEvent(id: Long) {
+        viewModelScope.launch { eventsDb.events().delete(id) }
     }
 
     fun setMethodPref(pref: MethodPref) {

@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Explore
@@ -27,6 +28,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -37,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.miqat.app.AppViewModel
 import com.miqat.app.R
+import java.time.LocalDate
 
 private data class Tab(val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector)
 
@@ -50,6 +53,8 @@ fun MiqatRoot(vm: AppViewModel, onRequestPermission: () -> Unit) {
         Tab("Prayer Times", Icons.Outlined.Mosque),
         Tab("Qibla", Icons.Outlined.Explore)
     )
+    var showAdd by remember { mutableStateOf(false) }
+    var addDate by remember { mutableStateOf<LocalDate?>(null) }
     BackHandler(enabled = showSettings) { showSettings = false }
 
     Scaffold(
@@ -61,6 +66,11 @@ fun MiqatRoot(vm: AppViewModel, onRequestPermission: () -> Unit) {
             ) {
                 Image(painterResource(R.drawable.ic_logo_fg), contentDescription = "MIQAT logo", modifier = Modifier.size(48.dp))
                 Text("MIQAT", color = White, fontSize = 22.sp, fontWeight = FontWeight.Bold, letterSpacing = 4.sp, modifier = Modifier.weight(1f))
+                if (selected == 0 && !showSettings) {
+                    IconButton(onClick = { addDate = null; showAdd = true }) {
+                        Icon(Icons.Filled.Add, contentDescription = "Add event", tint = White)
+                    }
+                }
                 IconButton(onClick = { showSettings = !showSettings }) {
                     Icon(
                         if (showSettings) Icons.Filled.Close else Icons.Outlined.Settings,
@@ -93,11 +103,22 @@ fun MiqatRoot(vm: AppViewModel, onRequestPermission: () -> Unit) {
                 SettingsScreen(state, vm)
             } else {
                 when (selected) {
-                    0 -> CalendarScreen(state)
+                    0 -> CalendarScreen(state, vm, onAddEvent = { d -> addDate = d; showAdd = true })
                     1 -> PrayerScreen(state, vm, onRequestPermission)
                     else -> QiblaScreen(state)
                 }
             }
         }
+    }
+
+    if (showAdd) {
+        AddEventDialog(
+            initialDate = addDate ?: LocalDate.now(),
+            onDismiss = { showAdd = false },
+            onSave = { d, t, desc, yearly ->
+                vm.addEvent(d, t, desc, yearly)
+                showAdd = false
+            }
+        )
     }
 }

@@ -5,9 +5,6 @@ plugins {
     id("com.google.devtools.ksp")
 }
 
-// Optional release signing: supplied by GitHub Actions secrets (see README).
-val releaseKeystorePath: String? = System.getenv("MIQAT_KEYSTORE_PATH")
-
 android {
     namespace = "com.miqat.app"
     compileSdk = 35
@@ -20,26 +17,27 @@ android {
         versionName = "1.0.0"
     }
 
+    // One fixed key for BOTH debug and release APKs, so every GitHub build can update the installed
+    // app in place and keep saved events. The key lives in the repo: fine for a personal app, not for a store.
     signingConfigs {
-        if (releaseKeystorePath != null) {
-            create("release") {
-                storeFile = file(releaseKeystorePath)
-                storePassword = System.getenv("MIQAT_KEYSTORE_PASSWORD")
-                keyAlias = System.getenv("MIQAT_KEY_ALIAS")
-                keyPassword = System.getenv("MIQAT_KEY_PASSWORD")
-            }
+        getByName("debug") {
+            storeFile = file("miqat-key.jks")
+            storePassword = "miqatkey2026"
+            keyAlias = "miqat"
+            keyPassword = "miqatkey2026"
+        }
+        create("release") {
+            storeFile = file("miqat-key.jks")
+            storePassword = "miqatkey2026"
+            keyAlias = "miqat"
+            keyPassword = "miqatkey2026"
         }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
-            // Falls back to the debug key so the release APK is still installable.
-            signingConfig = if (releaseKeystorePath != null) {
-                signingConfigs.getByName("release")
-            } else {
-                signingConfigs.getByName("debug")
-            }
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 
