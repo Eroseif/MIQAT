@@ -85,5 +85,6 @@ class MainActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         vm.setPermission(hasLocationPermission())
+        vm.refreshIfNewDay()
     }
 }

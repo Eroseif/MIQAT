@@ -2,6 +2,9 @@ package com.miqat.app.ui
 
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -42,6 +45,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.miqat.app.AppViewModel
+import com.miqat.app.AreaState
 import com.miqat.app.TtState
 import com.miqat.app.UiState
 import com.miqat.app.core.Geo
@@ -74,6 +78,7 @@ fun PrayerScreen(state: UiState, vm: AppViewModel, onRequestPermission: () -> Un
         item {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 LocationCard(state, onChange = { showDialog = true }, onUseGps = { vm.useGps() })
+                if (state.point != null) AreaCard(state.area, state.manual)
                 if (!state.permissionGranted && !state.manual) {
                     MiqatCard {
                         Text("Location permission is off", fontWeight = FontWeight.SemiBold)
@@ -275,4 +280,54 @@ private fun ManualLocationDialog(onDismiss: () -> Unit, onConfirm: (Double, Doub
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = White) } }
     )
+}
+
+
+@Composable
+private fun AreaCard(area: AreaState, manual: Boolean) {
+    var sel by remember(area.official) { mutableIntStateOf(0) }
+    MiqatCard {
+        Text("Prayer times for your area", fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
+        Spacer(Modifier.height(8.dp))
+        val o = area.official.getOrNull(sel)
+        if (o != null) {
+            Text("OFFICIAL MOSQUE TIMETABLE", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+            Text("${o.name} · ${Geo.formatDistance(o.distanceM)} away", fontWeight = FontWeight.SemiBold)
+            Text("Source: ${o.timetable.sourceName} · ${o.timetable.date}", color = LightGrey, fontSize = 12.sp)
+            if (area.officialStale) Text("Saved copy — you are offline, times may be out of date.", color = LightGrey, fontSize = 12.sp)
+            if (area.official.size > 1) {
+                Row(Modifier.horizontalScroll(rememberScrollState())) {
+                    area.official.forEachIndexed { i, x ->
+                        TextButton(onClick = { sel = i }) {
+                            Text(x.name, color = if (i == sel) White else LightGrey, maxLines = 1,
+                                fontWeight = if (i == sel) FontWeight.Bold else FontWeight.Normal)
+                        }
+                    }
+                }
+            }
+            TimeTable(o.timetable)
+            Spacer(Modifier.height(12.dp))
+        } else if (area.officialLoading) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                CircularProgressIndicator(color = White, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                Text("  Looking for mosque timetables nearby…", color = LightGrey)
+            }
+            Spacer(Modifier.height(12.dp))
+        } else {
+            Text(area.officialNote ?: "No published mosque timetable found within 15 km, so these are calculated times.", color = LightGrey, fontSize = 13.sp)
+            Spacer(Modifier.height(10.dp))
+        }
+        val c = area.calculated
+        if (c != null) {
+            Text("CALCULATED TIMES — NOT A MOSQUE TIMETABLE", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+            Text(
+                "${c.sourceName}. Shown in your phone's time zone" + (if (manual) " (manual location: check the zone)" else "") +
+                    ". Mosques may differ by a few minutes.",
+                color = LightGrey, fontSize = 12.sp
+            )
+            TimeTable(c)
+        } else {
+            Text("Prayer times could not be calculated for this location.", color = LightGrey)
+        }
+    }
 }

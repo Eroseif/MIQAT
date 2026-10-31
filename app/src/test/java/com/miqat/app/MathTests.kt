@@ -36,3 +36,29 @@ class MathTests {
         }
     }
 }
+
+class PrayerTimeTests {
+    private val auto = com.miqat.app.timetable.MethodPref.AUTOMATIC
+    private fun method(cc: String?, lat: Double = 0.0, lon: Double = 0.0) =
+        com.miqat.app.timetable.RegionMethods.choose(lat, lon, cc, auto).method
+
+    @Test fun automaticMethodFollowsCountry() {
+        assertEquals(com.batoulapps.adhan.CalculationMethod.MOON_SIGHTING_COMMITTEE, method("GB"))
+        assertEquals(com.batoulapps.adhan.CalculationMethod.KARACHI, method("PK"))
+        assertEquals(com.batoulapps.adhan.CalculationMethod.NORTH_AMERICA, method("US"))
+        assertEquals(com.batoulapps.adhan.CalculationMethod.UMM_AL_QURA, method("SA"))
+        assertEquals(com.batoulapps.adhan.CalculationMethod.MUSLIM_WORLD_LEAGUE, method("FR"))
+    }
+
+    @Test fun positionGuessUsedWhenCountryUnknown() {
+        assertEquals(com.batoulapps.adhan.CalculationMethod.MOON_SIGHTING_COMMITTEE, method(null, 52.39, -2.25))
+    }
+
+    @Test fun calculatedTimesHaveAllRows() {
+        val choice = com.miqat.app.timetable.RegionMethods.choose(52.39, -2.25, "GB", auto)
+        val t = com.miqat.app.timetable.CalculatedTimes.compute(52.39, -2.25, java.time.LocalDate.of(2026, 6, 21), choice)
+        org.junit.Assert.assertNotNull(t)
+        assertEquals(7, t!!.rows.size)
+        org.junit.Assert.assertTrue(t.rows.all { it.start != null })
+    }
+}

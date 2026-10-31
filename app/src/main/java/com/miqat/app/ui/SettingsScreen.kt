@@ -26,6 +26,7 @@ import com.miqat.app.UiState
 import com.miqat.app.hijri.CalendarMethod
 import com.miqat.app.hijri.HijriCalendar
 import com.miqat.app.hijri.Occasion
+import com.miqat.app.timetable.MethodPref
 import java.time.LocalDate
 
 @Composable
@@ -40,6 +41,26 @@ fun SettingsScreen(state: UiState, vm: AppViewModel) {
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item { Text("Settings", fontSize = 24.sp, fontWeight = FontWeight.Bold) }
+
+        item {
+            MiqatCard {
+                Text("Prayer time calculation", fontWeight = FontWeight.SemiBold)
+                Text(
+                    "Automatic uses the method usual for the country you are in, and changes as you travel. Pick one only if your local mosques follow a different method.",
+                    color = LightGrey, fontSize = 12.sp
+                )
+                MethodPref.values().forEach { m ->
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        RadioButton(
+                            selected = state.methodPref == m,
+                            onClick = { vm.setMethodPref(m) },
+                            colors = RadioButtonDefaults.colors(selectedColor = White, unselectedColor = White)
+                        )
+                        Text(m.label, fontSize = 14.sp)
+                    }
+                }
+            }
+        }
 
         item {
             MiqatCard {

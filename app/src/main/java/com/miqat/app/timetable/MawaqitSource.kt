@@ -21,21 +21,14 @@ interface OfficialTimetableSource {
 
 /**
  * Mawaqit (mawaqit.net) publishes timetables that mosques maintain themselves.
- * Uses the public nearest-mosque search, matches by location (and name), and reads today's times.
- * Unofficial use of a public endpoint: results are cached and requested only when a mosque is opened.
+ * Uses the public nearest-mosque search, which already embeds today's times.
+ * Unofficial use of a public endpoint: results are cached and requested sparingly.
  */
 class MawaqitSource(private val http: OkHttpClient) : OfficialTimetableSource {
     override val name = "Mawaqit (mawaqit.net)"
 
     override suspend fun fetch(mosque: Mosque, date: LocalDate): Timetable? {
-        val url = "https://mawaqit.net/api/2.0/mosque/search?lat=${mosque.lat}&lon=${mosque.lon}"
-        val req = Request.Builder().url(url).header("Accept", "application/json").build()
-        val body = http.newCall(req).execute().use { r ->
-            if (r.code == 401 || r.code == 403 || r.code == 404) return null
-            if (!r.isSuccessful) throw IOException("Mawaqit HTTP ${r.code}")
-            r.body?.string() ?: throw IOException("Empty response")
-        }
-        val arr = parseArray(body)
+        val arr = search(mosque.lat, mosque.lon) ?: return null
         var best: JSONObject? = null
         var bestD = Double.MAX_VALUE
         for (i in 0 until arr.length()) {
@@ -50,7 +43,42 @@ class MawaqitSource(private val http: OkHttpClient) : OfficialTimetableSource {
                 bestD = d
             }
         }
-        val o = best ?: return null
+        return best?.let { toTimetable(it, mosque.website, date) }
+    }
+
+    /** Official timetables published by mosques within [maxDistanceM] of a point, nearest first. */
+    fun nearby(lat: Double, lon: Double, date: LocalDate, maxDistanceM: Double, limit: Int): List<NearbyOfficial> {
+        val arr = search(lat, lon) ?: return emptyList()
+        val found = ArrayList<Pair<Double, NearbyOfficial>>()
+        for (i in 0 until arr.length()) {
+            val o = arr.optJSONObject(i) ?: continue
+            val la = o.optDouble("latitude", Double.NaN)
+            val lo = o.optDouble("longitude", Double.NaN)
+            if (la.isNaN() || lo.isNaN()) continue
+            val d = Geo.distanceMeters(lat, lon, la, lo)
+            if (d > maxDistanceM) continue
+            val tt = toTimetable(o, null, date) ?: continue
+            val nm = o.optString("name").ifBlank { o.optString("label") }.ifBlank { "Mosque" }
+            found.add(d to NearbyOfficial(nm, la, lo, tt))
+        }
+        return found.sortedBy { it.first }.take(limit).map { it.second }
+    }
+
+    private fun search(lat: Double, lon: Double): JSONArray? {
+        val url = "https://mawaqit.net/api/2.0/mosque/search?lat=$lat&lon=$lon"
+        val req = Request.Builder().url(url).header("Accept", "application/json").build()
+        val body = http.newCall(req).execute().use { r ->
+            if (r.code == 401 || r.code == 403 || r.code == 404) return null
+            if (!r.isSuccessful) throw IOException("Mawaqit HTTP ${r.code}")
+            r.body?.string() ?: throw IOException("Empty response")
+        }
+        val s = body.trim()
+        if (s.startsWith("[")) return JSONArray(s)
+        val o = JSONObject(s)
+        return o.optJSONArray("mosques") ?: o.optJSONArray("data") ?: JSONArray()
+    }
+
+    private fun toTimetable(o: JSONObject, fallbackUrl: String?, date: LocalDate): Timetable? {
         val times = o.optJSONArray("times") ?: return null
         if (times.length() < 6) return null
         val t = List(6) { times.optString(it) }
@@ -73,16 +101,9 @@ class MawaqitSource(private val http: OkHttpClient) : OfficialTimetableSource {
         val slug = o.optString("slug")
         return Timetable(
             TimetableKind.OFFICIAL, name,
-            if (slug.isNotBlank()) "https://mawaqit.net/en/$slug" else mosque.website,
+            if (slug.isNotBlank()) "https://mawaqit.net/en/$slug" else fallbackUrl,
             date.toString(), rows, jumuah, System.currentTimeMillis()
         )
-    }
-
-    private fun parseArray(body: String): JSONArray {
-        val s = body.trim()
-        if (s.startsWith("[")) return JSONArray(s)
-        val o = JSONObject(s)
-        return o.optJSONArray("mosques") ?: o.optJSONArray("data") ?: JSONArray()
     }
 
     private fun pad(s: String) = if (s.length == 4) "0$s" else s

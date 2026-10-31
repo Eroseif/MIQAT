@@ -63,3 +63,6 @@ data class TimetableBundle(
     val officialNote: String,
     val calculated: Timetable?
 )
+
+/** An official timetable found for a mosque near the user's position (used for the area view). */
+data class NearbyOfficial(val name: String, val lat: Double, val lon: Double, val timetable: Timetable)

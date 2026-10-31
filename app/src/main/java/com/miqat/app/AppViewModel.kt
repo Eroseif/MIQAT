@@ -12,7 +12,12 @@ import com.miqat.app.data.MiqatDb
 import com.miqat.app.data.Mosque
 import com.miqat.app.data.MosqueRepository
 import com.miqat.app.hijri.CalendarMethod
+import com.miqat.app.timetable.AreaRepository
+import com.miqat.app.timetable.CalculatedTimes
 import com.miqat.app.timetable.MawaqitSource
+import com.miqat.app.timetable.MethodPref
+import com.miqat.app.timetable.RegionMethods
+import com.miqat.app.timetable.Timetable
 import com.miqat.app.timetable.TimetableBundle
 import com.miqat.app.timetable.TimetableRepository
 import kotlinx.coroutines.CancellationException
@@ -36,10 +41,23 @@ sealed interface TtState {
     data class Loaded(val bundle: TimetableBundle) : TtState
 }
 
+data class NearbyOfficialUi(val name: String, val distanceM: Double, val timetable: Timetable)
+
+/** Prayer times for the area around the phone: official mosque timetables nearby + calculated times. */
+data class AreaState(
+    val calculated: Timetable? = null,
+    val methodLabel: String = "",
+    val official: List<NearbyOfficialUi> = emptyList(),
+    val officialLoading: Boolean = false,
+    val officialStale: Boolean = false,
+    val officialNote: String? = null
+)
+
 data class UiState(
     val point: LatLon? = null,
     val manual: Boolean = false,
     val placeName: String? = null,
+    val countryCode: String? = null,
     val permissionGranted: Boolean = false,
     val mosques: List<Mosque> = emptyList(),
     val loading: Boolean = false,
@@ -50,6 +68,8 @@ data class UiState(
     val error: String? = null,
     val expandedId: String? = null,
     val timetables: Map<String, TtState> = emptyMap(),
+    val area: AreaState = AreaState(),
+    val methodPref: MethodPref = MethodPref.AUTOMATIC,
     val calendarMethod: CalendarMethod = CalendarMethod.UMM_AL_QURA,
     val dayAdjustment: Int = 0
 )
@@ -64,11 +84,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             chain.proceed(chain.request().newBuilder().header("User-Agent", "MIQAT/1.0 (Android)").build())
         }
         .build()
+    private val mawaqit = MawaqitSource(http)
     private val mosqueRepo = MosqueRepository(db.cache(), http)
-    private val timetableRepo = TimetableRepository(db.cache(), listOf(MawaqitSource(http)))
+    private val timetableRepo = TimetableRepository(db.cache(), listOf(mawaqit))
+    private val areaRepo = AreaRepository(db.cache(), mawaqit)
 
     private val _state = MutableStateFlow(
-        UiState(calendarMethod = prefs.calendarMethod, dayAdjustment = prefs.dayAdjustment)
+        UiState(
+            calendarMethod = prefs.calendarMethod,
+            dayAdjustment = prefs.dayAdjustment,
+            methodPref = prefs.methodPref,
+            countryCode = prefs.countryCode
+        )
     )
     val state: StateFlow<UiState> = _state.asStateFlow()
 
@@ -77,13 +104,19 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private var rawMosques: List<Mosque> = emptyList()
     private var searchOrigin: LatLon? = null
+    private var areaOrigin: LatLon? = null
     private var geocodeOrigin: LatLon? = null
+    private var countryPoint: LatLon? = null
     private var searchJob: Job? = null
+    private var areaJob: Job? = null
 
     init {
         prefs.loadLocation()?.let { s ->
-            _state.update { it.copy(point = LatLon(s.lat, s.lon), manual = s.manual) }
+            val p = LatLon(s.lat, s.lon)
+            countryPoint = p
+            _state.update { it.copy(point = p, manual = s.manual) }
             startSearch()
+            refreshArea(fetchOfficial = true)
             resolvePlace()
         }
     }
@@ -106,12 +139,22 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (p != null) prefs.saveLocation(SavedLocation(p.lat, p.lon, false))
     }
 
+    /** New day (or app reopened after midnight / in another time zone): refresh today's times. */
+    fun refreshIfNewDay() {
+        val calc = _state.value.area.calculated
+        if (_state.value.point != null && (calc == null || calc.date != LocalDate.now().toString())) {
+            refreshArea(fetchOfficial = true)
+        }
+    }
+
     private fun applyPoint(p: LatLon, manual: Boolean) {
         prefs.saveLocation(SavedLocation(p.lat, p.lon, manual))
         _state.update { it.copy(point = p, manual = manual) }
         recomputeDistances()
         val moved = searchOrigin?.let { Geo.distanceMeters(it.lat, it.lon, p.lat, p.lon) > 1000 } ?: true
         if (moved) startSearch()
+        val areaMoved = areaOrigin?.let { Geo.distanceMeters(it.lat, it.lon, p.lat, p.lon) > 1000 } ?: true
+        refreshArea(fetchOfficial = areaMoved)
         resolvePlace()
     }
 
@@ -123,6 +166,30 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             .filter { it.distanceM <= s.radiusKm * 1000 }
             .sortedBy { it.distanceM }
         _state.update { it.copy(mosques = list) }
+    }
+
+    /** Recomputes the calculated times for the area; optionally re-scans for official mosque timetables. */
+    private fun refreshArea(fetchOfficial: Boolean) {
+        val s = _state.value
+        val p = s.point ?: return
+        val choice = RegionMethods.choose(p.lat, p.lon, s.countryCode, s.methodPref)
+        val calc = CalculatedTimes.compute(p.lat, p.lon, LocalDate.now(), choice)
+        _state.update { it.copy(area = it.area.copy(calculated = calc, methodLabel = choice.label)) }
+        if (!fetchOfficial) return
+
+        areaOrigin = p
+        areaJob?.cancel()
+        areaJob = viewModelScope.launch {
+            _state.update { it.copy(area = it.area.copy(official = emptyList(), officialLoading = true, officialNote = null, officialStale = false)) }
+            val r = areaRepo.officialNearby(p.lat, p.lon)
+            val ui = r.mosques
+                .map { NearbyOfficialUi(it.name, Geo.distanceMeters(p.lat, p.lon, it.lat, it.lon), it.timetable) }
+                .filter { it.distanceM <= 15000 }
+                .sortedBy { it.distanceM }
+            _state.update {
+                it.copy(area = it.area.copy(official = ui, officialLoading = false, officialStale = r.stale, officialNote = r.note))
+            }
+        }
     }
 
     fun startSearch() {
@@ -171,11 +238,20 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun loadTimetable(id: String) {
         val m = rawMosques.firstOrNull { it.id == id } ?: return
+        val s = _state.value
+        val choice = RegionMethods.choose(m.lat, m.lon, s.countryCode, s.methodPref)
         _state.update { it.copy(timetables = it.timetables + (id to TtState.Loading)) }
         viewModelScope.launch {
-            val b = timetableRepo.load(m)
+            val b = timetableRepo.load(m, choice)
             _state.update { it.copy(timetables = it.timetables + (id to TtState.Loaded(b))) }
         }
+    }
+
+    fun setMethodPref(pref: MethodPref) {
+        prefs.methodPref = pref
+        _state.update { it.copy(methodPref = pref, timetables = emptyMap()) }
+        refreshArea(fetchOfficial = false)
+        _state.value.expandedId?.let { loadTimetable(it) }
     }
 
     fun setCalendarMethod(m: CalendarMethod) {
@@ -197,17 +273,25 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (last != null && Geo.distanceMeters(last.lat, last.lon, p.lat, p.lon) < 2000) return
         geocodeOrigin = p
         viewModelScope.launch {
-            val name = withContext(Dispatchers.IO) {
+            val result: Pair<String?, String?>? = withContext(Dispatchers.IO) {
                 try {
                     if (!Geocoder.isPresent()) null else {
                         val a = Geocoder(getApplication(), Locale.getDefault()).getFromLocation(p.lat, p.lon, 1)?.firstOrNull()
-                        listOfNotNull(a?.locality ?: a?.subAdminArea, a?.countryName).joinToString(", ").ifBlank { null }
+                        val place = listOfNotNull(a?.locality ?: a?.subAdminArea, a?.countryName).joinToString(", ").ifBlank { null }
+                        Pair(place, a?.countryCode)
                     }
                 } catch (e: Exception) {
                     null
                 }
             }
-            _state.update { it.copy(placeName = name) }
+            val newCountry = result?.second
+            val before = _state.value.countryCode
+            val keep = countryPoint?.let { Geo.distanceMeters(it.lat, it.lon, p.lat, p.lon) < 100_000 } ?: false
+            val country = newCountry ?: if (keep) before else null
+            if (newCountry != null) countryPoint = p
+            prefs.countryCode = country
+            _state.update { it.copy(placeName = result?.first ?: it.placeName, countryCode = country) }
+            if (country != before) refreshArea(fetchOfficial = false)
         }
     }
 }

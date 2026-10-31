@@ -13,9 +13,9 @@ class TimetableRepository(
     private val dao: CacheDao,
     private val sources: List<OfficialTimetableSource>
 ) {
-    suspend fun load(m: Mosque): TimetableBundle = withContext(Dispatchers.IO) {
+    suspend fun load(m: Mosque, choice: MethodChoice): TimetableBundle = withContext(Dispatchers.IO) {
         val today = LocalDate.now()
-        val calculated = CalculatedTimes.compute(m.lat, m.lon, today)
+        val calculated = CalculatedTimes.compute(m.lat, m.lon, today, choice)
         val key = "tt:${m.id}:$today"
         val cached = dao.get(key)
         val now = System.currentTimeMillis()

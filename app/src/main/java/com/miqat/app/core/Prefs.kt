@@ -2,6 +2,7 @@ package com.miqat.app.core
 
 import android.content.Context
 import com.miqat.app.hijri.CalendarMethod
+import com.miqat.app.timetable.MethodPref
 
 data class SavedLocation(val lat: Double, val lon: Double, val manual: Boolean)
 
@@ -35,4 +36,14 @@ class Prefs(context: Context) {
     var dayAdjustment: Int
         get() = sp.getInt("cal_adjust", 0).coerceIn(-1, 1)
         set(v) = sp.edit().putInt("cal_adjust", v.coerceIn(-1, 1)).apply()
+
+    var methodPref: MethodPref
+        get() = runCatching { MethodPref.valueOf(sp.getString("method_pref", MethodPref.AUTOMATIC.name)!!) }
+            .getOrDefault(MethodPref.AUTOMATIC)
+        set(v) = sp.edit().putString("method_pref", v.name).apply()
+
+    /** Country code of the last resolved location (so the right method is used offline). */
+    var countryCode: String?
+        get() = sp.getString("country", null)
+        set(v) = sp.edit().putString("country", v).apply()
 }
