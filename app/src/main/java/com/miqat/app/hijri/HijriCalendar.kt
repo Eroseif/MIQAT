@@ -22,16 +22,18 @@ enum class CalendarMethod(val label: String, val description: String) {
 
 data class HijriDate(val year: Int, val month: Int, val day: Int)
 
-enum class Occasion(val label: String) {
-    ISLAMIC_NEW_YEAR("Islamic New Year"),
-    ASHURA("Ashura"),
-    MAWLID("Mawlid (observed by many; not an official holiday in Saudi Arabia)"),
-    RAMADAN_START("Start of Ramadan"),
-    LAST_TEN("Last ten nights of Ramadan (Laylat al-Qadr period)"),
-    EID_AL_FITR("Eid al-Fitr"),
-    ARAFAH("Day of Arafah"),
-    EID_AL_ADHA("Eid al-Adha")
+enum class Occasion(val label: String, val short: String) {
+    ISLAMIC_NEW_YEAR("Islamic New Year", "Islamic New Year"),
+    ASHURA("Ashura", "Ashura"),
+    MAWLID("Mawlid (observed by many; not an official holiday in Saudi Arabia)", "Mawlid"),
+    RAMADAN_START("Start of Ramadan", "Start of Ramadan"),
+    LAST_TEN("Last ten nights of Ramadan (Laylat al-Qadr period)", "Laylat al-Qadr period begins"),
+    EID_AL_FITR("Eid al-Fitr", "Eid al-Fitr"),
+    ARAFAH("Day of Arafah", "Day of Arafah"),
+    EID_AL_ADHA("Eid al-Adha", "Eid al-Adha")
 }
+
+data class Upcoming(val date: LocalDate, val occasion: Occasion, val hijri: HijriDate, val daysAway: Long)
 
 data class RamadanInfo(
     val inRamadan: Boolean,
@@ -68,6 +70,22 @@ class HijriCalendar(val method: CalendarMethod, val adjustment: Int) {
         if (h.month == 12 && h.day == 9) add(Occasion.ARAFAH)
         if (h.month == 12 && h.day == 10) add(Occasion.EID_AL_ADHA)
     }
+
+    /** Occasions from [from] over the next [days] days (the last-ten-nights period is listed once, at its start). */
+    fun upcoming(from: LocalDate, days: Int): List<Upcoming> {
+        val out = ArrayList<Upcoming>()
+        for (i in 0..days) {
+            val d = from.plusDays(i.toLong())
+            val h = fromGregorian(d)
+            for (o in occasions(h)) {
+                if (o == Occasion.LAST_TEN && h.day != 21) continue
+                out.add(Upcoming(d, o, h, i.toLong()))
+            }
+        }
+        return out
+    }
+
+    fun nextEvent(from: LocalDate): Upcoming? = upcoming(from, 400).firstOrNull()
 
     /** Estimated, from the selected method. Never an official moon-sighting announcement. */
     fun ramadanInfo(today: LocalDate): RamadanInfo {
