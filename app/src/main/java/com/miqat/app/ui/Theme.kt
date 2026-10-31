@@ -16,6 +16,7 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 val Black = Color(0xFF000000)
@@ -45,17 +46,18 @@ fun MiqatTheme(content: @Composable () -> Unit) {
 fun MiqatCard(
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
+    padding: Dp = 16.dp,
     content: @Composable ColumnScope.() -> Unit
 ) {
     val colors = CardDefaults.cardColors(containerColor = CardGrey, contentColor = White)
     val shape = RoundedCornerShape(16.dp)
     if (onClick != null) {
         Card(onClick = onClick, modifier = modifier.fillMaxWidth(), shape = shape, colors = colors) {
-            Column(Modifier.padding(16.dp), content = content)
+            Column(Modifier.padding(padding), content = content)
         }
     } else {
         Card(modifier = modifier.fillMaxWidth(), shape = shape, colors = colors) {
-            Column(Modifier.padding(16.dp), content = content)
+            Column(Modifier.padding(padding), content = content)
         }
     }
 }

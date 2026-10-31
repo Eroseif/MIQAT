@@ -109,17 +109,17 @@ fun CalendarScreen(state: UiState, vm: AppViewModel, onAddEvent: (LocalDate?) ->
 
     LazyColumn(
         state = listState,
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        contentPadding = PaddingValues(12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         item {
-            MiqatCard {
-                Text(today.format(longDate), fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
-                Text(fmtHijri(hToday), fontSize = 18.sp, color = LightGrey)
+            MiqatCard(padding = 12.dp) {
+                Text(today.format(longDate), fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                Text(fmtHijri(hToday), fontSize = 14.sp, color = LightGrey)
             }
         }
         item {
-            MiqatCard {
+            MiqatCard(padding = 8.dp) {
                 Box(
                     Modifier
                         .clipToBounds()
@@ -162,24 +162,24 @@ fun CalendarScreen(state: UiState, vm: AppViewModel, onAddEvent: (LocalDate?) ->
         }
         selected?.let { d ->
             item {
-                MiqatCard {
-                    Text(d.format(longDate), fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
-                    Text(fmtHijri(cal.fromGregorian(d)), color = LightGrey, fontSize = 13.sp)
-                    Spacer(Modifier.height(6.dp))
+                MiqatCard(padding = 12.dp) {
+                    Text(d.format(longDate), fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                    Text(fmtHijri(cal.fromGregorian(d)), color = LightGrey, fontSize = 12.sp)
+                    Spacer(Modifier.height(4.dp))
                     val list = CalEvents.forDate(d, cal, userEvents)
                     if (list.isEmpty()) {
-                        Text("No events on this day.", color = LightGrey, fontSize = 14.sp)
+                        Text("No events on this day.", color = LightGrey, fontSize = 13.sp)
                     } else {
                         list.forEachIndexed { i, e ->
-                            if (i > 0) HorizontalDivider(color = DividerGrey, modifier = Modifier.padding(vertical = 6.dp))
+                            if (i > 0) HorizontalDivider(color = DividerGrey, modifier = Modifier.padding(vertical = 4.dp))
                             Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), verticalAlignment = Alignment.Top) {
                                 Column(Modifier.weight(1f)) {
-                                    Text(e.title, fontWeight = FontWeight.SemiBold, fontSize = 17.sp)
+                                    Text(e.title, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
                                     if (e.description.isNotBlank()) {
-                                        Text(e.description, fontSize = 15.sp, modifier = Modifier.padding(top = 2.dp))
+                                        Text(e.description, fontSize = 13.sp, modifier = Modifier.padding(top = 2.dp))
                                     }
                                     val small = if (e.note.isBlank()) e.kind.label else "${e.kind.label} · ${e.note}"
-                                    Text(small, color = LightGrey, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
+                                    Text(small, color = LightGrey, fontSize = 11.sp, modifier = Modifier.padding(top = 2.dp))
                                 }
                                 if (e.kind == EventKind.USER && e.userId != null) {
                                     TextButton(onClick = { vm.deleteEvent(e.userId) }) { Text("Delete", color = White) }
@@ -187,25 +187,25 @@ fun CalendarScreen(state: UiState, vm: AppViewModel, onAddEvent: (LocalDate?) ->
                             }
                         }
                     }
-                    Spacer(Modifier.height(6.dp))
+                    Spacer(Modifier.height(4.dp))
                     MiqatButton("Add event on this day") { onAddEvent(d) }
                 }
             }
         }
         if (coming.isNotEmpty()) {
             item {
-                MiqatCard {
-                    Text("Coming up (next 30 days)", fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
-                    coming.take(4).forEach { e ->
+                MiqatCard(padding = 12.dp) {
+                    Text("Coming up (next 30 days)", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                    coming.take(3).forEach { e ->
                         val days = ChronoUnit.DAYS.between(today, e.date)
                         val due = when (days) { 0L -> "today"; 1L -> "tomorrow"; else -> "in $days days" }
-                        Spacer(Modifier.height(6.dp))
-                        Text(e.title, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
-                        Text("$due · ${e.date.format(shortDate)} · ${e.kind.label}", color = LightGrey, fontSize = 12.sp)
+                        Spacer(Modifier.height(4.dp))
+                        Text(e.title, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                        Text("$due · ${e.date.format(shortDate)} · ${e.kind.label}", color = LightGrey, fontSize = 11.sp)
                     }
-                    if (coming.size > 4) {
-                        Spacer(Modifier.height(6.dp))
-                        Text("and ${coming.size - 4} more", color = LightGrey, fontSize = 12.sp)
+                    if (coming.size > 3) {
+                        Spacer(Modifier.height(4.dp))
+                        Text("and ${coming.size - 3} more", color = LightGrey, fontSize = 11.sp)
                     }
                 }
             }
@@ -232,27 +232,27 @@ private fun MonthView(
 
     Column(Modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onPrev) { Icon(Icons.Filled.KeyboardArrowLeft, "Previous month", tint = White) }
+            IconButton(onClick = onPrev, modifier = Modifier.size(36.dp)) { Icon(Icons.Filled.KeyboardArrowLeft, "Previous month", tint = White) }
             Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("${shown.month.getDisplayName(TextStyle.FULL, Locale.ENGLISH)} ${shown.year}", fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
+                Text("${shown.month.getDisplayName(TextStyle.FULL, Locale.ENGLISH)} ${shown.year}", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
                 val first = hijriFor.getValue(days.first())
                 val last = hijriFor.getValue(days.last())
                 val label = if (first.month == last.month && first.year == last.year)
                     "${HijriCalendar.monthName(first.month)} ${first.year} AH"
                 else "${HijriCalendar.monthName(first.month)} ${first.year} – ${HijriCalendar.monthName(last.month)} ${last.year} AH"
-                Text(label, color = LightGrey, fontSize = 13.sp, textAlign = TextAlign.Center)
+                Text(label, color = LightGrey, fontSize = 11.sp, textAlign = TextAlign.Center)
             }
-            IconButton(onClick = onNext) { Icon(Icons.Filled.KeyboardArrowRight, "Next month", tint = White) }
-        }
-        if (off != 0) {
-            TextButton(onClick = onToday, modifier = Modifier.align(Alignment.CenterHorizontally)) {
-                Text("Back to today", color = White)
+            if (off != 0) {
+                TextButton(onClick = onToday, contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp)) {
+                    Text("Today", color = White, fontSize = 12.sp)
+                }
             }
+            IconButton(onClick = onNext, modifier = Modifier.size(36.dp)) { Icon(Icons.Filled.KeyboardArrowRight, "Next month", tint = White) }
         }
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(2.dp))
         Row(Modifier.fillMaxWidth()) {
             for (dow in DayOfWeek.values()) {
-                Text(dow.getDisplayName(TextStyle.SHORT, Locale.ENGLISH).take(3), color = LightGrey, fontSize = 11.sp, textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
+                Text(dow.getDisplayName(TextStyle.SHORT, Locale.ENGLISH).take(3), color = LightGrey, fontSize = 10.sp, textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
             }
         }
         val lead = shown.atDay(1).dayOfWeek.value - 1
@@ -262,7 +262,7 @@ private fun MonthView(
                 for (i in 0 until 7) {
                     val d = week.getOrNull(i)
                     if (d == null) {
-                        Box(Modifier.weight(1f).aspectRatio(0.8f))
+                        Box(Modifier.weight(1f).height(46.dp))
                     } else {
                         val h = hijriFor.getValue(d)
                         DayCell(
@@ -287,26 +287,26 @@ private fun RowScope.DayCell(
     onClick: () -> Unit
 ) {
     Column(
-        Modifier.weight(1f).padding(vertical = 2.dp)
-            .clip(RoundedCornerShape(10.dp))
+        Modifier.weight(1f).padding(vertical = 1.dp)
+            .clip(RoundedCornerShape(8.dp))
             .background(if (isSelected) SelectedGrey else Color.Transparent)
             .clickable(onClick = onClick)
-            .padding(vertical = 2.dp),
+            .padding(vertical = 1.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Box(
-            Modifier.size(34.dp)
+            Modifier.size(30.dp)
                 .then(if (hasUser) Modifier.border(1.5.dp, White, CircleShape) else Modifier)
                 .padding(3.dp)
                 .background(if (isToday) White else Color.Transparent, CircleShape),
             contentAlignment = Alignment.Center
         ) {
-            Text(date.dayOfMonth.toString(), color = if (isToday) Black else White, fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal)
+            Text(date.dayOfMonth.toString(), fontSize = 13.sp, color = if (isToday) Black else White, fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal)
         }
         Text(
             if (hijri.day == 1) "1 ${HijriCalendar.monthShort(hijri.month)}" else hijri.day.toString(),
-            color = LightGrey, fontSize = 10.sp, maxLines = 1
+            color = LightGrey, fontSize = 9.sp, maxLines = 1
         )
-        Box(Modifier.size(4.dp).background(if (hasOther) White else Color.Transparent, CircleShape))
+        Box(Modifier.size(3.dp).background(if (hasOther) White else Color.Transparent, CircleShape))
     }
 }

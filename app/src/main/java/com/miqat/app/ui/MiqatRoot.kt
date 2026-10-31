@@ -61,10 +61,10 @@ fun MiqatRoot(vm: AppViewModel, onRequestPermission: () -> Unit) {
         containerColor = Black,
         topBar = {
             Row(
-                Modifier.fillMaxWidth().background(Black).padding(top = 40.dp, start = 16.dp, end = 8.dp, bottom = 4.dp),
+                Modifier.fillMaxWidth().background(Black).padding(top = 36.dp, start = 16.dp, end = 8.dp, bottom = 0.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Image(painterResource(R.drawable.ic_logo_fg), contentDescription = "MIQAT logo", modifier = Modifier.size(48.dp))
+                Image(painterResource(R.drawable.ic_logo_fg), contentDescription = "MIQAT logo", modifier = Modifier.size(40.dp))
                 Text("MIQAT", color = White, fontSize = 22.sp, fontWeight = FontWeight.Bold, letterSpacing = 4.sp, modifier = Modifier.weight(1f))
                 if (selected == 0 && !showSettings) {
                     IconButton(onClick = { addDate = null; showAdd = true }) {
