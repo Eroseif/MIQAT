@@ -3,7 +3,6 @@ package com.miqat.app.core
 import android.content.Context
 import com.miqat.app.hijri.CalendarMethod
 import com.miqat.app.timetable.MethodPref
-import com.miqat.app.zakat.NisabBasis
 
 data class SavedLocation(val lat: Double, val lon: Double, val manual: Boolean)
 
@@ -48,13 +47,23 @@ class Prefs(context: Context) {
         get() = sp.getString("country", null)
         set(v) = sp.edit().putString("country", v).apply()
 
-    var nisabBasis: NisabBasis
-        get() = runCatching { NisabBasis.valueOf(sp.getString("nisab_basis", NisabBasis.SILVER.name)!!) }
-            .getOrDefault(NisabBasis.SILVER)
-        set(v) = sp.edit().putString("nisab_basis", v.name).apply()
+    /** Religious rule: weight of 24K gold that sets the nisab (default 85 g). Kept as text, parsed with BigDecimal. */
+    var nisabGrams: String
+        get() = sp.getString("nisab_grams", "85") ?: "85"
+        set(v) = sp.edit().putString("nisab_grams", v).apply()
 
-    /** null = automatic (currency of the country you are in). */
-    var zakatCurrency: String?
-        get() = sp.getString("zakat_currency", null)
-        set(v) = sp.edit().putString("zakat_currency", v).apply()
+    /** Religious rule: zakat rate in percent (default 2.5). */
+    var zakatRatePercent: String
+        get() = sp.getString("zakat_rate_pct", "2.5") ?: "2.5"
+        set(v) = sp.edit().putString("zakat_rate_pct", v).apply()
+
+    /** "GBP" by default, any currency code, or "AUTO" for the currency of the country you are in. */
+    var zakatCurrency: String
+        get() = sp.getString("zakat_currency2", "GBP") ?: "GBP"
+        set(v) = sp.edit().putString("zakat_currency2", v).apply()
+
+    /** Epoch day of the hawl end we already notified about (Long.MIN_VALUE = none). */
+    var zakatNotifiedDue: Long
+        get() = sp.getLong("zakat_notified", Long.MIN_VALUE)
+        set(v) = sp.edit().putLong("zakat_notified", v).apply()
 }

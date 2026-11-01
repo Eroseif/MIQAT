@@ -5,6 +5,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
@@ -35,6 +36,22 @@ class MainActivity : ComponentActivity() {
             if (!granted) vm.permissionDenials++
             vm.setPermission(granted)
         }
+
+    private val notificationLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted -> vm.setZakatReminder(granted) }
+
+    /** The zakat reminder is optional and off by default; Android 13+ needs the notification permission. */
+    private fun toggleReminder(on: Boolean) {
+        if (!on) {
+            vm.setZakatReminder(false)
+        } else if (Build.VERSION.SDK_INT >= 33 &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            vm.setZakatReminder(true)
+        }
+    }
 
     private fun hasLocationPermission() =
         ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
@@ -77,7 +94,7 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             MiqatTheme {
-                MiqatRoot(vm = vm, onRequestPermission = { requestLocation() })
+                MiqatRoot(vm = vm, onRequestPermission = { requestLocation() }, onToggleReminder = { toggleReminder(it) })
             }
         }
     }
@@ -86,5 +103,6 @@ class MainActivity : ComponentActivity() {
         super.onStart()
         vm.setPermission(hasLocationPermission())
         vm.refreshIfNewDay()
+        vm.refreshPrices()
     }
 }

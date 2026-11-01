@@ -45,7 +45,7 @@ import java.time.LocalDate
 private data class Tab(val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector)
 
 @Composable
-fun MiqatRoot(vm: AppViewModel, onRequestPermission: () -> Unit) {
+fun MiqatRoot(vm: AppViewModel, onRequestPermission: () -> Unit, onToggleReminder: (Boolean) -> Unit) {
     val state by vm.state.collectAsState()
     var selected by rememberSaveable { mutableIntStateOf(0) }
     var showSettings by rememberSaveable { mutableStateOf(false) }
@@ -108,7 +108,7 @@ fun MiqatRoot(vm: AppViewModel, onRequestPermission: () -> Unit) {
                     0 -> CalendarScreen(state, vm, onAddEvent = { d -> addDate = d; showAdd = true })
                     1 -> PrayerScreen(state, vm, onRequestPermission)
                     2 -> QiblaScreen(state)
-                    else -> ZakatScreen(state, vm)
+                    else -> ZakatScreen(state, vm, onToggleReminder)
                 }
             }
         }

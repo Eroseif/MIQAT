@@ -27,7 +27,7 @@ import com.miqat.app.hijri.CalendarMethod
 import com.miqat.app.hijri.HijriCalendar
 import com.miqat.app.hijri.Occasion
 import com.miqat.app.timetable.MethodPref
-import com.miqat.app.zakat.NisabBasis
+import com.miqat.app.zakat.ZakatMath
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.runtime.getValue
@@ -70,30 +70,43 @@ fun SettingsScreen(state: UiState, vm: AppViewModel) {
         }
 
         item {
-            var code by remember(state.zakatCurrency) { mutableStateOf(state.zakatCurrency ?: "") }
+            var grams by remember(state.nisabGrams) { mutableStateOf(state.nisabGrams) }
+            var pct by remember(state.ratePercent) { mutableStateOf(state.ratePercent) }
+            var code by remember(state.zakatCurrency) { mutableStateOf(if (state.zakatCurrency == "AUTO") "" else state.zakatCurrency) }
             MiqatCard {
-                Text("Zakat", fontWeight = FontWeight.SemiBold)
-                Text("Nisab is measured in", color = LightGrey, fontSize = 12.sp)
-                NisabBasis.values().forEach { b ->
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        RadioButton(
-                            selected = state.nisabBasis == b,
-                            onClick = { vm.setNisabBasis(b) },
-                            colors = RadioButtonDefaults.colors(selectedColor = White, unselectedColor = White)
-                        )
-                        Text(b.label, fontSize = 14.sp)
-                    }
-                }
-                HorizontalDivider(color = DividerGrey, modifier = Modifier.padding(vertical = 6.dp))
-                Text("Currency", color = LightGrey, fontSize = 12.sp)
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    RadioButton(
-                        selected = state.zakatCurrency == null,
-                        onClick = { code = ""; vm.setZakatCurrency(null) },
-                        colors = RadioButtonDefaults.colors(selectedColor = White, unselectedColor = White)
-                    )
-                    Text("Automatic (country you are in)", fontSize = 14.sp)
-                }
+                Text("Zakat rules (Maliki, gold nisab)", fontWeight = FontWeight.SemiBold)
+                Text(
+                    "These are religious rules, not market data: gold prices never change them. Change them only on a scholar's advice.",
+                    color = LightGrey, fontSize = 12.sp
+                )
+                Spacer(Modifier.height(6.dp))
+                OutlinedTextField(
+                    value = grams,
+                    onValueChange = { v ->
+                        val c = v.filter { ch -> ch.isDigit() || ch == '.' }.take(8)
+                        grams = c
+                        if (ZakatMath.parse(c).signum() > 0) vm.setNisabGrams(c)
+                    },
+                    label = { Text("Nisab weight (grams of 24K gold)") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(6.dp))
+                OutlinedTextField(
+                    value = pct,
+                    onValueChange = { v ->
+                        val c = v.filter { ch -> ch.isDigit() || ch == '.' }.take(6)
+                        pct = c
+                        val n = ZakatMath.parse(c)
+                        if (n.signum() > 0 && n.compareTo(java.math.BigDecimal(100)) <= 0) vm.setRatePercent(c)
+                    },
+                    label = { Text("Zakat rate (%)") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(6.dp))
                 OutlinedTextField(
                     value = code,
                     onValueChange = { v ->
@@ -101,7 +114,7 @@ fun SettingsScreen(state: UiState, vm: AppViewModel) {
                         code = c
                         if (c.length == 3) vm.setZakatCurrency(c)
                     },
-                    label = { Text("Or a currency code (GBP, DZD, USD…)") },
+                    label = { Text("Zakat currency code (GBP, USD, EUR, DZD…)") },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
                     modifier = Modifier.fillMaxWidth()

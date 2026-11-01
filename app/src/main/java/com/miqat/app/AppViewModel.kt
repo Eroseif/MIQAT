@@ -23,11 +23,14 @@ import com.miqat.app.timetable.Timetable
 import com.miqat.app.timetable.TimetableBundle
 import com.miqat.app.timetable.TimetableRepository
 import com.miqat.app.zakat.MarketPrices
-import com.miqat.app.zakat.NisabBasis
+import com.miqat.app.zakat.ZakatDb
+import com.miqat.app.zakat.ZakatHistory
+import com.miqat.app.zakat.ZakatProfile
 import com.miqat.app.zakat.PriceRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -84,8 +87,9 @@ data class UiState(
     val area: AreaState = AreaState(),
     val methodPref: MethodPref = MethodPref.AUTOMATIC,
     val prices: PricesState = PricesState(),
-    val nisabBasis: NisabBasis = NisabBasis.SILVER,
-    val zakatCurrency: String? = null,
+    val nisabGrams: String = "85",
+    val ratePercent: String = "2.5",
+    val zakatCurrency: String = "GBP",
     val calendarMethod: CalendarMethod = CalendarMethod.UMM_AL_QURA,
     val dayAdjustment: Int = 0
 )
@@ -108,6 +112,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private var pricesJob: Job? = null
 
     private val eventsDb = EventsDb.build(app)
+    private val zakatDb = ZakatDb.build(app)
+
+    // Zakat entries live in memory for instant typing and are written to the database one at a time, newest wins.
+    private val _zakatProfile = MutableStateFlow(ZakatProfile())
+    val zakatProfile: StateFlow<ZakatProfile> = _zakatProfile.asStateFlow()
+    private val profileSaves = Channel<ZakatProfile>(Channel.CONFLATED)
+    val zakatHistory: StateFlow<List<ZakatHistory>> =
+        zakatDb.dao().history().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     /** Birthdays and special days added by the user (stored on this phone only). */
     val events: StateFlow<List<UserEvent>> =
@@ -118,7 +130,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             calendarMethod = prefs.calendarMethod,
             dayAdjustment = prefs.dayAdjustment,
             methodPref = prefs.methodPref,
-            nisabBasis = prefs.nisabBasis,
+            nisabGrams = prefs.nisabGrams,
+            ratePercent = prefs.zakatRatePercent,
             zakatCurrency = prefs.zakatCurrency,
             countryCode = prefs.countryCode
         )
@@ -137,6 +150,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private var areaJob: Job? = null
 
     init {
+        viewModelScope.launch {
+            zakatDb.dao().profile()?.let { _zakatProfile.value = it }
+            for (p in profileSaves) zakatDb.dao().saveProfile(p)
+        }
+        refreshPrices()
         prefs.loadLocation()?.let { s ->
             val p = LatLon(s.lat, s.lon)
             countryPoint = p
@@ -304,13 +322,35 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun setNisabBasis(b: NisabBasis) {
-        prefs.nisabBasis = b
-        _state.update { it.copy(nisabBasis = b) }
+    fun updateProfile(change: (ZakatProfile) -> ZakatProfile) {
+        val p = change(_zakatProfile.value)
+        _zakatProfile.value = p
+        profileSaves.trySend(p)
     }
 
-    /** null = automatic (currency of the country you are in). */
-    fun setZakatCurrency(code: String?) {
+    fun setZakatReminder(on: Boolean) = updateProfile { it.copy(reminder = on) }
+
+    fun saveCalculation(h: ZakatHistory) {
+        viewModelScope.launch { zakatDb.dao().addHistory(h) }
+    }
+
+    fun deleteCalculation(id: Long) {
+        viewModelScope.launch { zakatDb.dao().deleteHistory(id) }
+    }
+
+    /** Religious rule settings (never changed by market prices). */
+    fun setNisabGrams(v: String) {
+        prefs.nisabGrams = v
+        _state.update { it.copy(nisabGrams = v) }
+    }
+
+    fun setRatePercent(v: String) {
+        prefs.zakatRatePercent = v
+        _state.update { it.copy(ratePercent = v) }
+    }
+
+    /** "GBP", another currency code, or "AUTO" (currency of the country you are in). */
+    fun setZakatCurrency(code: String) {
         prefs.zakatCurrency = code
         _state.update { it.copy(zakatCurrency = code) }
     }
